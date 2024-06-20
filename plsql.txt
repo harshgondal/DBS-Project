@@ -1,0 +1,144 @@
+5.SQL> CREATE OR REPLACE TRIGGER update_inventory_on_completion
+  2  AFTER UPDATE OF status ON supplier
+  3  FOR EACH ROW
+  4  WHEN (OLD.status <> NEW.status AND NEW.status = 'Completed')
+  5  BEGIN
+  6      IF :NEW.status = 'Completed' THEN
+  7          UPDATE comp_inventory
+  8          SET no_inventory = no_inventory + (SELECT no_ordered FROM comp_inventory WHERE c_no = :NEW.c_id),
+
+  9              no_ordered = 0
+ 10          WHERE c_no = :NEW.c_id;
+ 11      END IF;
+ 12  END;
+ 13  /
+
+
+
+3.
+ CREATE OR REPLACE PROCEDURE check_due_date_warning AS
+    v_due_date DATE;
+    v_diff NUMBER;
+BEGIN
+    -- Loop through each due date in the expense table
+    FOR expense_rec IN (SELECT due_date FROM expense) LOOP
+        -- Calculate the difference between system date and due date
+        v_diff := expense_rec.due_date - SYSDATE;
+
+        -- Check if the difference is less than 1 day
+        IF v_diff < 2 THEN
+            -- Print warning message
+            DBMS_OUTPUT.PUT_LINE('WARNING: Due date is approaching. Please complete the task soon!');
+        ELSE
+            -- No action required
+            DBMS_OUTPUT.PUT_LINE('No action required.');
+        END IF;
+    END LOOP;
+END;
+/
+
+
+
+2.
+CREATE OR REPLACE TRIGGER update_scheme_trigger
+BEFORE INSERT OR UPDATE OF salary ON employee
+FOR EACH ROW
+BEGIN
+    IF :NEW.salary >= 10000 THEN
+        :NEW.scheme_id := 1; -- Assign scheme ID 1 for salary >= 10000
+    ELSIF :NEW.salary >= 9000 THEN
+        :NEW.scheme_id := 2; -- Assign scheme ID 2 for salary >= 9000
+    ELSIF :NEW.salary >= 8000 THEN
+        :NEW.scheme_id := 3; -- Assign scheme ID 3 for salary >= 8000
+    ELSIF :NEW.salary >= 7000 THEN
+        :NEW.scheme_id := 4; -- Assign scheme ID 4 for salary >= 7000
+    ELSIF :NEW.salary >= 6000 THEN
+        :NEW.scheme_id := 5; -- Assign scheme ID 5 for salary >= 6000
+    ELSE
+        -- If none of the conditions are met, keep the existing scheme ID
+        NULL;
+    END IF;
+END;
+/
+
+
+6.CREATE OR REPLACE PROCEDURE generate_monthly_expense_report (
+    p_year IN NUMBER,
+    p_month IN NUMBER
+)
+IS
+    v_start_date DATE;
+    v_end_date DATE;
+BEGIN
+    -- Calculate the start and end dates of the specified month
+    v_start_date := TO_DATE(p_year || '-' || p_month || '-01', 'YYYY-MM-DD');
+    v_end_date := LAST_DAY(v_start_date);
+
+    -- Print report header
+    DBMS_OUTPUT.PUT_LINE('Monthly Expense Report for ' || TO_CHAR(v_start_date, 'YYYY-MON'));
+
+    -- Query to retrieve expenses for the specified month
+    FOR expense_record IN (
+        SELECT 
+            bill_id,
+            machine_id,
+            supplier_id,
+            description,
+            receiver,
+            amount,
+            due_date
+        FROM 
+            expense
+        WHERE 
+            EXTRACT(YEAR FROM due_date) = p_year
+            AND EXTRACT(MONTH FROM due_date) = p_month
+    ) LOOP
+        -- Print expense details
+        DBMS_OUTPUT.PUT_LINE('Expense ID: ' || expense_record.bill_id);
+        DBMS_OUTPUT.PUT_LINE('Machine ID: ' || expense_record.machine_id);
+        DBMS_OUTPUT.PUT_LINE('Supplier ID: ' || expense_record.supplier_id);
+        DBMS_OUTPUT.PUT_LINE('Description: ' || expense_record.description);
+        DBMS_OUTPUT.PUT_LINE('Receiver: ' || expense_record.receiver);
+        DBMS_OUTPUT.PUT_LINE('Amount: ' || expense_record.amount);
+        DBMS_OUTPUT.PUT_LINE('Due Date: ' || TO_CHAR(expense_record.due_date, 'YYYY-MM-DD'));
+        DBMS_OUTPUT.PUT_LINE('-------------------------------------');
+    END LOOP;
+
+    -- Print report footer
+    DBMS_OUTPUT.PUT_LINE('End of Monthly Expense Report');
+EXCEPTION
+    WHEN OTHERS THEN
+        DBMS_OUTPUT.PUT_LINE('Error: ' || SQLERRM);
+END;
+/
+
+
+8.CREATE OR REPLACE FUNCTION update_production_status RETURN NUMBER AS
+BEGIN
+    FOR vehicle_rec IN (SELECT * FROM vehicle) LOOP
+        DECLARE
+            v_days NUMBER;
+        BEGIN
+            -- Calculate the difference between production date and current date
+            SELECT TRUNC(SYSDATE) - TRUNC(vehicle_rec.PRODUCTION_DATE) INTO v_days FROM DUAL;
+            
+            -- Update production status based on the difference in days
+            IF v_days <= 1 THEN
+                UPDATE vehicle SET production_status = 'Completed' WHERE VEHICLE_ID = vehicle_rec.VEHICLE_ID;
+            ELSIF v_days BETWEEN 2 AND 7 THEN
+                UPDATE vehicle SET production_status = 'Delayed' WHERE VEHICLE_ID = vehicle_rec.VEHICLE_ID;
+            ELSE
+                UPDATE vehicle SET production_status = 'Stalled' WHERE VEHICLE_ID = vehicle_rec.VEHICLE_ID;
+            END IF;
+
+            -- Print the updated record
+            DBMS_OUTPUT.PUT_LINE('Vehicle ID: ' || vehicle_rec.VEHICLE_ID || ', Production Status: ' || vehicle_rec.PRODUCTION_STATUS);
+        END;
+    END LOOP;
+    RETURN 1;
+END;
+/
+
+
+
+
